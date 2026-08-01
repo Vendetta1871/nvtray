@@ -126,6 +126,25 @@ struct GpuTray {
     active: bool,
 }
 
+/// Launches nvidia-settings detached, if it is installed.
+fn open_settings() {
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+
+    if let Ok(mut child) = Command::new("nvidia-settings")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0) // detach from our session
+        .spawn()
+    {
+        // Reap the child when it exits so it doesn't linger as a zombie.
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+    }
+}
+
 impl Tray for GpuTray {
     fn id(&self) -> String {
         "nvtray".into()
@@ -147,13 +166,25 @@ impl Tray for GpuTray {
         }
     }
 
+    fn activate(&mut self, _x: i32, _y: i32) {
+        open_settings();
+    }
+
     fn menu(&self) -> Vec<MenuItem<Self>> {
-        vec![StandardItem {
-            label: "Quit".into(),
-            activate: Box::new(|_| std::process::exit(0)),
-            ..Default::default()
-        }
-        .into()]
+        vec![
+            StandardItem {
+                label: "Open Settings".into(),
+                activate: Box::new(|_| open_settings()),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: "Quit".into(),
+                activate: Box::new(|_| std::process::exit(0)),
+                ..Default::default()
+            }
+            .into(),
+        ]
     }
 }
 

@@ -16,6 +16,8 @@ lights up with a rainbow gradient while the GPU is under load.
   unplug the eGPU / unload the driver and the icon disappears,
   plug it back and it returns automatically
 - Tooltip shows GPU and memory-controller utilization
+- Left-clicking the icon opens `nvidia-settings` (when installed);
+  the right-click menu has "Open Settings" and "Quit"
 - Single small static-ish binary (~3 MB)
 
 ## Build

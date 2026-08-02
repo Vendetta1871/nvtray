@@ -162,11 +162,8 @@ impl Tray for GpuTray {
 
     fn tool_tip(&self) -> ToolTip {
         ToolTip {
-            title: "NVIDIA GPU Activity".into(),
-            description: format!(
-                "GPU: {}% | VRAM: {}% | Temp: {}°C",
-                self.util, self.vram, self.temp
-            ),
+            title: format!("NVIDIA GPU Activity: {}%", self.util),
+            description: format!("VRAM: {}% | Temp: {}°C", self.vram, self.temp),
             ..Default::default()
         }
     }

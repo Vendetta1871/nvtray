@@ -18,6 +18,7 @@ use std::time::Duration;
 
 use ksni::menu::StandardItem;
 use ksni::{Icon, MenuItem, ToolTip, Tray, TrayMethods};
+use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 use nvml_wrapper::Nvml;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(1000);
@@ -122,7 +123,8 @@ fn make_icon(size: i32, active: bool) -> Icon {
 
 struct GpuTray {
     util: u32,
-    mem: u32,
+    vram: u32,
+    temp: u32,
     active: bool,
 }
 
@@ -160,8 +162,11 @@ impl Tray for GpuTray {
 
     fn tool_tip(&self) -> ToolTip {
         ToolTip {
-            title: format!("NVIDIA GPU Activity: {}%", self.util),
-            description: format!("Memory controller: {}%", self.mem),
+            title: "NVIDIA GPU Activity".into(),
+            description: format!(
+                "GPU: {}% | VRAM: {}% | Temp: {}°C",
+                self.util, self.vram, self.temp
+            ),
             ..Default::default()
         }
     }
@@ -208,7 +213,7 @@ async fn main() {
         // No tray icon at all while there is no NVIDIA GPU in the system.
         let nvml = wait_for_gpu().await;
 
-        let tray = GpuTray { util: 0, mem: 0, active: false };
+        let tray = GpuTray { util: 0, vram: 0, temp: 0, active: false };
         let handle = match tray.spawn().await {
             Ok(h) => h,
             Err(e) => {
@@ -220,16 +225,21 @@ async fn main() {
 
         // Poll until the GPU disappears (eGPU unplugged, driver unloaded...).
         loop {
-            match nvml
-                .device_by_index(0)
-                .and_then(|d| d.utilization_rates())
-            {
-                Ok(u) => {
+            let stats = nvml.device_by_index(0).and_then(|d| {
+                let util = d.utilization_rates()?.gpu;
+                let mem = d.memory_info()?;
+                let vram = (mem.used.saturating_mul(100) / mem.total.max(1)) as u32;
+                let temp = d.temperature(TemperatureSensor::Gpu)?;
+                Ok((util, vram, temp as u32))
+            });
+            match stats {
+                Ok((util, vram, temp)) => {
                     handle
                         .update(|t: &mut GpuTray| {
-                            t.util = u.gpu;
-                            t.mem = u.memory;
-                            t.active = u.gpu > 0;
+                            t.util = util;
+                            t.vram = vram;
+                            t.temp = temp;
+                            t.active = util > 0;
                         })
                         .await;
                     tokio::time::sleep(POLL_INTERVAL).await;
